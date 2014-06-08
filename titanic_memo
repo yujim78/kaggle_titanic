@@ -1,0 +1,124 @@
+
+train.csv
+ 891件
+> table(train$Survived)
+
+  0   1 
+549 342 
+> prop.table(table(train$Survived))
+
+        0         1 
+0.6161616 0.3838384 
+
+死亡:549(61.6%)
+生存:342(38.3%)
+
+test.csv
+ 418件
+
+http://trevorstephens.com/post/72918760617/titanic-getting-started-with-r-part-1-booting-up-r
+より、全て０件でsubmitすると0.62679
+死亡:262(62.6%)
+生存:156(37.4%)
+と判る
+
+Rでクロス集計(行ごと)
+> prop.table(table(train$Sex,train$Survived),1)
+        
+                 0         1
+  female 0.2579618 0.7420382
+  male   0.8110919 0.1889081
+
+> prop.table(table(test$Sex))
+
+   female      male 
+0.3636364 0.6363636 
+
+(女性すべてが生存したとしても正解の比率から男性4人が助かっているはず)
+とりあえず女性すべて生存という結果でsubmitしてみる
+0.76555
+
+
+18歳以下を子供とみなし列を追加(NAはとりあえず大人に分類)
+性別と年齢での生存を集計
+
+> train$Child <- 0
+> train$Child[train$Age < 18] <- 1
+> aggregate(Survived ~ Child + Sex, data=train, FUN=length)
+  Child    Sex Survived
+1     0 female      259
+2     1 female       55
+3     0   male      519
+4     1   male       58
+> aggregate(Survived ~ Child + Sex, data=train, FUN=function(x){sum(x)/length(x)})
+  Child    Sex  Survived
+1     0 female 0.7528958
+2     1 female 0.6909091
+3     0   male 0.1657033
+4     1   male 0.3965517
+
+男性には大人と子供で差が大きく出ている
+女性にはそれほど大きな差は出ていない
+
+
+運賃、等級、性別と生存の傾向を見てみる
+
+> train$Fare2 <- '30+'
+> train$Fare2[train$Fare < 30 & train$Fare >= 20] <- '20-30'
+> train$Fare2[train$Fare < 20 & train$Fare >= 10] <- '10-20'
+> train$Fare2[train$Fare < 10] <- '<10'
+> aggregate(Survived ~ Fare2 +Pclass + Sex, data=train, FUN=function(x){sum(x)/length(x)})
+   Fare2 Pclass    Sex  Survived
+1  20-30      1 female 0.8333333
+2    30+      1 female 0.9772727
+3  10-20      2 female 0.9142857
+4  20-30      2 female 0.9000000
+5    30+      2 female 1.0000000
+6    <10      3 female 0.5937500
+7  10-20      3 female 0.5813953
+8  20-30      3 female 0.3333333
+9    30+      3 female 0.1250000
+10   <10      1   male 0.0000000
+11 20-30      1   male 0.4000000
+12   30+      1   male 0.3837209
+13   <10      2   male 0.0000000
+14 10-20      2   male 0.1587302
+15 20-30      2   male 0.1600000
+16   30+      2   male 0.2142857
+17   <10      3   male 0.1115385
+18 10-20      3   male 0.2368421
+19 20-30      3   male 0.1250000
+20   30+      3   male 0.2400000
+> 
+
+女性は等級２までは９割近く生存
+男性は等級１の20ドル以上は４割近く生存
+女性の等級３、２０ドル以上が生存率がかなり低い
+
+女性の等級３の２０ドル以上を死亡とみなす
+
+#tutorial 3rd (female Pclass:3 Fare:20+ died)
+test$Survived <- 0
+test$Survived[test$Sex == 'female'] <- 1
+test$Survived[test$Sex == 'female' & test$Pclass == 3 & test$Fare >=20 ] <- 0
+
+0.77990
+
+
+DecisionTreeを使ってみる
+
+fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data=train, method="class")
+
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+fancyRpartPlot(fit)
+
+prediction <- predict(fit, test, type="class")
+
+0.78469
+
+
+
+
